@@ -13,3 +13,47 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model User {
+  id        String    @id @default(uuid())
+  name      String?
+  email     String    @unique
+  password  String
+  projects  Project[] @relation("OwnedProjects")
+  members   Member[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  Task      Task[]
+}
+
+model Project {
+  id        String   @id @default(uuid())
+  name      String
+  owner     User     @relation("OwnedProjects", fields: [ownerId], references: [id])
+  ownerId   String
+  members   Member[]
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Member {
+  id        String  @id @default(uuid())
+  user      User    @relation(fields: [userId], references: [id])
+  userId    String
+  Project   Project @relation(fields: [projectId], references: [id])
+  projectId String
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?
+  status      String // todo | in-progress | done
+  project     Project  @relation(fields: [projectId], references: [id])
+  projectId   String
+  assignee    User?    @relation(fields: [assigneeId], references: [id])
+  assigneeId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
