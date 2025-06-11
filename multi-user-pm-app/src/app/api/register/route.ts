@@ -1,40 +1,30 @@
-import { hashPassword } from "@/lib/bcrypt";
+import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { NextRequest, NextResponse } from "next/server";
+import { hashPassword } from "@/lib/bcrypt";
 
-export async function POST(request: NextRequest, response: NextResponse) {
-  const body = await request.json();
-  const { name, email, password } = body;
+export async function POST(req: Request) {
+  try {
+    const { name, email, password } = await req.json();
 
-  if (!email || !password) {
+    const existingUser = await prisma.user.findUnique({ where: { email } });
+    if (existingUser) {
+      return NextResponse.json(
+        { message: "Email is already registered" },
+        { status: 400 }
+      );
+    }
+
+    const hashed = await hashPassword(password);
+
+    await prisma.user.create({
+      data: { name, email, password: hashed },
+    });
+
+    return NextResponse.json({ message: "Registration successful" });
+  } catch (error) {
     return NextResponse.json(
-      { error: "Email and password are required" },
-      { status: 400 }
+      { message: "Registration failed" },
+      { status: 500 }
     );
   }
-
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    return NextResponse.json(
-      { error: "User with this email already exists" },
-      { status: 400 }
-    );
-  }
-
-  const hadhedPassword = await hashPassword(password);
-  const user = await prisma.user.create({
-    data: {
-      name,
-      email,
-      password: hadhedPassword,
-    },
-  });
-
-  return NextResponse.json({
-    success: true,
-    user: {
-      id: user.id,
-      email: user.email,
-    },
-  });
 }
