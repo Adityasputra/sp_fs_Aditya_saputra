@@ -1,100 +1,164 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+import { RegisterSchema } from "@/lib/schemas/auth.schema";
+import Image from "next/image";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    password: "",
-  });
-  const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const res = await fetch("/api/register", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(form),
-    });
 
-    if (!res.ok) {
-      const { error } = await res.json();
-      setError(error || "Registration failed");
+    const result = RegisterSchema.safeParse({ name, email, password });
+
+    if (!result.success) {
+      toast.dismiss();
+      result.error.errors.forEach((err) => toast.error(err.message));
       return;
-    } else {
-      router.push("/login");
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
+
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        toast.error("Unexpected server response");
+        setIsLoading(false);
+        return;
+      }
+
+      if (res.ok) {
+        toast.success("Registration successful! Redirecting to login...", {
+          onClose: () => router.push("/login"),
+          autoClose: 2000,
+        });
+      } else {
+        const errorMessages = Array.isArray(data.message)
+          ? data.message
+          : [data.message || "An error occurred"];
+        toast.dismiss();
+        errorMessages.forEach((msg: string) =>
+          toast.error(msg, {
+            autoClose: 3000,
+            position: "top-right",
+          })
+        );
+      }
+    } catch (error) {
+      toast.error("Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white p-6 rounded shadow-md w-full max-w-sm"
-      >
-        <h2 className="text-2xl font-bold mb-4">Register</h2>
-        {error && <p className="text-red-500 mb-4">{error}</p>}
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="name">
-            Name
-          </label>
-          <input
-            type="text"
-            name="name"
-            id="name"
-            value={form.name}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring"
-          />
+    <>
+      <ToastContainer />
+      <main className="flex items-center justify-center min-h-screen bg-gray-50 px-4">
+        <div className="flex bg-white rounded-2xl shadow-lg overflow-hidden w-full max-w-4xl">
+          <div className="hidden md:block md:w-1/2 relative">
+            <Image
+              src="/images/workshop-unsplash.jpg"
+              alt="Register illustration"
+              fill
+              unoptimized
+              className="object-cover"
+            />
+          </div>
+
+          <div className="w-full md:w-1/2 p-8 md:p-12 space-y-6">
+            <CardTitle className="text-center text-3xl font-bold text-gray-800">
+              Create an Account
+            </CardTitle>
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="grid gap-2">
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Your name"
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  disabled={isLoading}
+                />
+              </div>
+
+              <div className="grid gap-2 relative">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="********"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-7.5 text-gray-500 hover:text-gray-700"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full mt-2"
+              >
+                {isLoading ? "Registering..." : "Register"}
+              </Button>
+            </form>
+
+            <p className="text-center text-sm text-gray-600">
+              Already have an account?{" "}
+              <Link href="/login">
+                <Button variant="link" className="p-0 h-auto">
+                  Sign In
+                </Button>
+              </Link>
+            </p>
+          </div>
         </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="email">
-            Email
-          </label>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            value={form.email}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring"
-          />
-        </div>
-        <div className="mb-4">
-          <label className="block text-sm font-medium mb-1" htmlFor="password">
-            Password
-          </label>
-          <input
-            type="password"
-            name="password"
-            id="password"
-            value={form.password}
-            onChange={handleChange}
-            required
-            className="w-full px-3 py-2 border rounded focus:outline-none focus:ring"
-          />
-        </div>
-        <button
-          type="submit"
-          className="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700 transition-colors"
-        >
-          Register
-        </button>
-      </form>
-    </div>
+      </main>
+    </>
   );
 }
