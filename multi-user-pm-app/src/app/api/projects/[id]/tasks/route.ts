@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
 
   const isMember =
     project?.ownerId === userId ||
-    project?.members.some((m) => m.userId === userId);
+    project?.members.some((m: { userId: string }) => m.userId === userId);
 
   if (!project || !isMember) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
 
   const isMember =
     project?.ownerId === userId ||
-    project?.members.some((m) => m.userId === userId);
+    project?.members.some((m: { userId: string }) => m.userId === userId);
 
   if (!project || !isMember) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });

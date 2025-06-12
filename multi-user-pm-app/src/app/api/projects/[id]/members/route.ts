@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
 
   if (
     !project ||
+    !project.owner ||
+    !project.members ||
     (project.ownerId !== userId &&
-      !project.members.some((m) => m.userId === userId))
+      !project.members.some((m: { userId: string }) => m.userId === userId))
   ) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
