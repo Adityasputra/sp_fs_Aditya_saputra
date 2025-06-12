@@ -44,10 +44,12 @@ export async function GET(request: NextRequest) {
       id: project.owner.id,
       email: project.owner.email,
     },
-    members: project.members.map((m) => ({
-      id: m.user.id,
-      email: m.user.email,
-    })),
+    members: project.members.map(
+      (m: { user: { id: string; email: string } }) => ({
+        id: m.user.id,
+        email: m.user.email,
+      })
+    ),
     tasks: project.tasks,
   };
 
