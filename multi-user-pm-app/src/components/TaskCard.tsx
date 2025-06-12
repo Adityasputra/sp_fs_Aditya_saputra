@@ -32,6 +32,11 @@ export default function TaskCard({
       {task.description && (
         <p className="text-sm text-gray-600">{task.description}</p>
       )}
+      {task.assignee?.name && (
+        <p className="text-xs text-muted-foreground">
+          Assigned to: {task.assignee.name}
+        </p>
+      )}
     </div>
   );
 }
