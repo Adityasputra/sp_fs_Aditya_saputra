@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
   const users = [
     { id: project.owner.id, email: project.owner.email, role: "Owner" },
-    ...project.members.map((m) => ({
+    ...project.members.map((m: { user: { id: string; email: string } }) => ({
       id: m.user.id,
       email: m.user.email,
       role: "Member",

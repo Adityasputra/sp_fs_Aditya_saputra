@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
   if (assigneeId) {
     const memberIds = [
       project.ownerId,
-      ...project.members.map((m) => m.userId),
+      ...project.members.map((m: { userId: string }) => m.userId),
     ];
     isValidAssignee = memberIds.includes(assigneeId);
   }
