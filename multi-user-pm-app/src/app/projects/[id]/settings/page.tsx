@@ -1,9 +1,33 @@
 "use client";
 
+import useSWR from "swr";
+import { useState } from "react";
+import { redirect, usePathname, useRouter } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Label } from "@/components/ui/label";
+import {
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTrigger,
+  AlertDialogCancel,
+  AlertDialogAction,
+  AlertDialogTitle,
+  AlertDialogDescription,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuSeparator,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { toast } from "react-toastify";
+import ProfileSection from "@/components/Profile";
+import { signOut } from "next-auth/react";
 
 type Member = {
   id: string;
@@ -11,34 +35,23 @@ type Member = {
   role: "Owner" | "Member";
 };
 
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
+
 export default function ProjectSettings() {
   const pathname = usePathname();
   const projectId = pathname.split("/")[2];
   const router = useRouter();
 
-  const [members, setMembers] = useState<Member[]>([]);
+  const { data: members = [], mutate } = useSWR<Member[]>(
+    projectId ? `/api/projects/${projectId}/members` : null,
+    fetcher
+  );
   const [inviteEmail, setInviteEmail] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
 
-  // Fetch member list
-  useEffect(() => {
-    fetch(`/api/projects/${projectId}/members`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.error) {
-          setMembers(data);
-        } else {
-          setError(data.error);
-        }
-      });
-  }, [projectId]);
-
-  // Handle invite
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
 
     const res = await fetch(`/api/projects/${projectId}/invite`, {
       method: "POST",
@@ -47,96 +60,173 @@ export default function ProjectSettings() {
 
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "Gagal mengundang member.");
+      toast.error(data.error || "Failed to invite member.");
     } else {
       setInviteEmail("");
-      // refresh member list
-      const updated = await fetch(`/api/projects/${projectId}/members`).then(
-        (r) => r.json()
-      );
-      setMembers(updated);
+      toast.success("Member invited successfully.");
+      mutate();
     }
 
     setLoading(false);
   };
 
-  // Handle delete project
   const handleDelete = async () => {
-    const confirmed = confirm("Yakin ingin menghapus project ini?");
-    if (!confirmed) return;
-
     const res = await fetch(`/api/projects/${projectId}`, {
       method: "DELETE",
     });
 
     if (res.ok) {
+      toast.success("Project deleted successfully.");
       router.push("/dashboard");
     } else {
-      alert("Gagal menghapus project.");
+      toast.error("Failed to delete the project.");
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto py-8 space-y-8">
-      <h1 className="text-2xl font-bold">Pengaturan Project</h1>
+    <>
+      <div className="p-6 max-w-2xl mx-auto space-y-8">
+        <div className="relative mb-6">
+          <div>
+            <h1 className="text-3xl font-bold">Project Settings</h1>
+            <div className="w-1/2">
+              <p className="text-muted-foreground break-words whitespace-pre-line md:whitespace-nowrap">
+                Managing, and members who joined for this project.
+              </p>
+            </div>
+          </div>
+          <div className="absolute right-0 top-0">
+            <div className="flex md:items-center items-end md:space-x-2 gap-2 flex-col-reverse md:flex-row">
+              <Button onClick={() => redirect("/dashboard")}>Dashboard</Button>
+              <p className="hidden md:block">|</p>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    Profile
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56 mt-2">
+                  <ProfileSection />
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Button variant="destructive" onClick={() => signOut()}>
+                      Sign Out
+                    </Button>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+        </div>
 
-      {/* Invite Member */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">Undang Member</h2>
-        <form onSubmit={handleInvite} className="flex gap-2">
-          <Input
-            type="email"
-            placeholder="Email user..."
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            required
-          />
-          <Button type="submit" disabled={loading}>
-            {loading ? "Mengundang..." : "Undang"}
+        <Card>
+          <CardHeader>
+            <CardTitle>Invite Member</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleInvite} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <div className="flex flex-col sm:flex-row gap-2 w-full">
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="User email..."
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full sm:w-auto"
+                  >
+                    {loading ? "Inviting..." : "Invite"}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Member List</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <ul className="space-y-2 min-w-[250px]">
+                {members.map((member) => (
+                  <li
+                    key={member.id}
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between border rounded-md p-2 text-sm gap-1"
+                  >
+                    <span className="break-all">{member.email}</span>
+                    <span className="text-muted-foreground">{member.role}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-destructive">Delete Project</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-destructive text-destructive hover:bg-destructive/10"
+                >
+                  Delete Project
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Are you sure you want to delete this project?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone and will delete all tasks
+                    related to this project.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDelete}
+                    className="w-full sm:w-auto"
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+
+        <div className="text-right mt-4 space-x-2">
+          <Button
+            variant="outline"
+            className="w-full sm:w-auto"
+            onClick={() =>
+              window.open(`/api/projects/${projectId}/export`, "_blank")
+            }
+          >
+            Export to JSON
           </Button>
-        </form>
-        {error && <p className="text-red-500 mt-2 text-sm">{error}</p>}
-      </section>
-
-      {/* List Member */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2">Daftar Member</h2>
-        <ul className="space-y-2">
-          {members.map((member) => (
-            <li
-              key={member.id}
-              className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-md border"
-            >
-              <span>{member.email}</span>
-              <span className="text-sm text-gray-500">{member.role}</span>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* Delete Project */}
-      <section>
-        <h2 className="text-lg font-semibold mb-2 text-red-600">
-          Hapus Project
-        </h2>
-        <Button
-          variant="outline"
-          onClick={handleDelete}
-          className="border-red-500 text-red-600 hover:bg-red-50"
-        >
-          Hapus Project
-        </Button>
-      </section>
-
-      <Button
-        variant="outline"
-        className="border-gray-400"
-        onClick={() => {
-          window.open(`/api/projects/${projectId}/export`, "_blank");
-        }}
-      >
-        Export ke JSON
-      </Button>
-    </div>
+          <Button
+            variant="default"
+            className="w-full sm:w-auto mt-2"
+            onClick={() => redirect(`/projects/${projectId}`)}
+          >
+            Go to Task Board
+          </Button>
+        </div>
+      </div>
+    </>
   );
 }

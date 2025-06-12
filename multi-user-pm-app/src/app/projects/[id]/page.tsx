@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import { useState } from "react";
-import { redirect, useParams } from "next/navigation";
+import { redirect, useParams, usePathname } from "next/navigation";
 import TaskBoard from "@/components/TaskBoard";
 import TaskAnalytics from "@/components/TaskAnalytics";
 import { Task } from "@/types/Task";
@@ -20,18 +20,40 @@ import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
 import { Separator } from "@/components/ui/separator";
 import ProfileSection from "@/components/Profile";
-import { signOut } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
+type Member = {
+  id: string;
+  name: string;
+  email: string;
+};
+
 export default function ProjectDetailPage() {
   const { id } = useParams();
+  const pathname = usePathname();
+  const session = useSession();
+  const projectId = pathname.split("/")[2];
   const { data: tasks = [], mutate } = useSWR<Task[]>(
     id ? `/api/projects/${id}/tasks` : null,
     fetcher
   );
+  const { data: members = [] } = useSWR<Member[]>(
+    id ? `/api/projects/${projectId}/members` : null,
+    fetcher
+  );
+
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [assigneeId, setAssigneeId] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleCreate = async (e: React.FormEvent) => {
@@ -43,11 +65,11 @@ export default function ProjectDetailPage() {
       const res = await fetch(`/api/projects/${id}/tasks`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({ title, description, assigneeId }),
       });
 
       if (!res.ok) {
-        toast.error("Failed to create task");
+        toast.error("Failed to add task");
         return;
       }
 
@@ -55,10 +77,11 @@ export default function ProjectDetailPage() {
       mutate([...(tasks as Task[]), newTask], false);
       setTitle("");
       setDescription("");
-      toast.success("Task added!");
+      setAssigneeId(null);
+      toast.success("Task added successfully");
       mutate();
     } catch {
-      toast.error("Something went wrong.");
+      toast.error("An error occurred.");
     } finally {
       setIsSubmitting(false);
     }
@@ -71,9 +94,11 @@ export default function ProjectDetailPage() {
       <div className="relative mb-6">
         <div>
           <h1 className="text-3xl font-bold">Task Board</h1>
-          <p className="text-muted-foreground">
-            Manage and track tasks for this project.
-          </p>
+          <div className="w-1/2">
+            <p className="text-muted-foreground break-words whitespace-pre-line md:whitespace-nowrap">
+              Manage and track tasks for this project.
+            </p>
+          </div>
         </div>
         <div className="absolute right-0 top-0">
           <div className="flex md:items-center items-end md:space-x-2 gap-2 flex-col-reverse md:flex-row">
@@ -87,6 +112,16 @@ export default function ProjectDetailPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent className="w-56 mt-2">
                 <ProfileSection />
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Button
+                    variant="link"
+                    className="w-full justify-start outline-none"
+                    onClick={() => redirect(`/projects/${id}/settings`)}
+                  >
+                    Settings
+                  </Button>
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <Button variant="destructive" onClick={() => signOut()}>
@@ -117,6 +152,22 @@ export default function ProjectDetailPage() {
               onChange={(e) => setDescription(e.target.value)}
               disabled={isSubmitting}
             />
+            <Select
+              onValueChange={(val) => setAssigneeId(val)}
+              defaultValue={assigneeId ?? ""}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Select assignee (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {members.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name ?? member.email}
+                    {member.id === session.data?.user.id ? " (You)" : ""}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Adding..." : "Add Task"}
             </Button>
