@@ -6,4 +6,8 @@ export type Task = {
   assigneeId?: string | null;
   createdAt: string;
   updatedAt: string;
+  assignee?: {
+    id: string;
+    name: string;
+  } | null;
 };
