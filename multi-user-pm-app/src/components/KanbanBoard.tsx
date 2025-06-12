@@ -27,7 +27,7 @@ export default function KanbanBoard({ tasks, projectId }: Props) {
     );
 
     if (!res.ok) {
-      alert("Gagal update status");
+      alert("failed to update status");
     }
   };
 
