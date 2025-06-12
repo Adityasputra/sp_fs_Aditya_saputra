@@ -33,6 +33,15 @@ export async function GET(req: NextRequest) {
   const tasks = await prisma.task.findMany({
     where: { projectId },
     orderBy: { createdAt: "asc" },
+    include: {
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
+    },
   });
 
   return NextResponse.json(tasks, {
@@ -67,7 +76,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { title, description } = await req.json();
+  const { title, description, assigneeId } = await req.json();
+
+  let isValidAssignee = true;
+  if (assigneeId) {
+    const memberIds = [
+      project.ownerId,
+      ...project.members.map((m) => m.userId),
+    ];
+    isValidAssignee = memberIds.includes(assigneeId);
+  }
+
+  if (!isValidAssignee) {
+    return NextResponse.json({ error: "Invalid assignee" }, { status: 400 });
+  }
 
   const task = await prisma.task.create({
     data: {
@@ -75,7 +97,16 @@ export async function POST(req: NextRequest) {
       description,
       status: "todo",
       projectId,
-      assigneeId: userId,
+      assigneeId: assigneeId ?? userId,
+    },
+    include: {
+      assignee: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+        },
+      },
     },
   });
 
